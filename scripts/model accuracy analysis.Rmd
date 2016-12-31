@@ -1,0 +1,112 @@
+---
+title: "Accuracy Analysis"
+author: "Jeffrey Williams"
+date: "12/23/2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(knitr)
+library(ggplot2)
+library(dplyr)
+knitr::opts_chunk$set(echo = TRUE)
+opts_knit$set(root.dir = "~/Documents/Data Science Courses/Coursera/Data Science Specialization (JHU)/10 Capstone Project/final/en_US/accuracy results/")
+```
+
+# Accuracy Results Data Analysis
+
+This document will analyize the results of the NLP model developed to predict text as part of the Coursera JHU Data Science Capstone. This document will be examining results of model predictions using various amount of training data from the raw twitter, blog and news text corpus. 
+
+A series of test data (2% of total data) was randomly sampled from the cleaned data set of blogs, news and twitter corpus data. From this testing data, a series of 2,3,4, and 5 gram phrases were generated and stored into text files. The script "prep_test_samples" then performs the following to create the testing dataset:
+
+1. Remove all grams with frequency < 3 as these are "rare" phrases and would not be expected to be predicted on a regular basis. Note, this threshold for rare phrases in a parameter in the script which can be modified.  
+2. Sort the phrases in order of n-gram and frequency of occurance.  
+3. Split out the last word in the phrase and separate from the first part of the gram. This final phrase word becomes the actual result.  
+4. Keep only the first row for each duplicate of the partial phrase. This actual completion word result for the partial phrase will have the largest value of occurances in the training set and is assumed to be the most likely completion of the partial phrase.  
+    
+Note: Phrases are pulled from a significantly larger dataset of the total than any of the training sets, so it is likely there are a few phrases which will not have known words. 
+
+## Load Result Data
+
+Load in the data from accuracy results folder
+
+```{r}
+# create a vector containing the training set pcts of the total raw data explored for model accuracy:
+training_pcts <- c(0.01, 0.005, 0.003, 0.001)
+
+# create data frame to concatonate all the separate files together
+df <- data.frame()
+for (train_pct in training_pcts){
+    data_read <- read.csv(file = paste("./accuracy_results_modeltrain_",train_pct,"pct.csv",sep = ""))
+
+  if(train_pct == 0.01){
+    df<-data_read
+  }
+  else{
+      df <- merge(data_read, df, all = TRUE)
+  }
+}
+```
+
+## Descriptive stats
+
+Display some basic stats of the dataset.
+Display a few rows of the dataset of results and calulate some high-level column stats:
+
+```{r}
+df[,"unknown_word"] <- df$predicted_word == "No Word Predicted!"
+
+head(df,15)
+
+df_summary <- df %>% 
+  group_by(pct_data,ng) %>% 
+  summarise(mean_process_time = mean(pred_time_ms),
+            sd_process_time = sd(pred_time_ms),
+            pct_correct_predicted = 100*mean(Result),
+            pct_unknown = 100*mean(unknown_word))
+df_summary
+```
+
+## Plots
+
+Let's begin by looking at some histograms of the dataset.
+
+### Histogram of prediction process times
+
+First we will examine the process prediction times by the percentage of training data used from the total data set (facets), and by the size of the maximum n-gram used durng the preduction (colour).
+
+```{r}
+ggplot(df, aes(x=pred_time_ms, fill=as.factor(ng))) +
+    geom_bar() +
+    facet_grid(.~pct_data, scales = "free") +
+    labs(title = "Histogram of Prediction Time by n-gram and training %", x="Process time for prediction (ms)", y="number of predictions",fill = "n-gram")
+```
+As seen from the plots, it appears as though using 0.003 or 0.3% of the raw dataset gives a resonably fast prediciton times (~<= 500ms). We will now see how the prediciton accuracy compares across these data subsets.
+
+### Prediction accuracy (and unkown words)
+
+We will now investigate the relationship between training set percentage and n-grams used vs prediction accuracy and known words.
+
+```{r}
+limits <- aes(ymax = mean_process_time + sd_process_time, ymin=mean_process_time - sd_process_time)
+
+ggplot(df_summary,aes(pct_correct_predicted,mean_process_time, label = 100*pct_data)) +
+    geom_line(aes(colour = as.factor(ng))) +
+    geom_errorbar(limits, width=0.2) + 
+    geom_text(size=2, hjust = 0, nudge_x = 0.25) + 
+    geom_hline(yintercept=500) + 
+    labs(title = "Process Time (ms) vs Model Accruacy, color = n-gram, label = % train", y="Average process time for prediction (ms)", x="Model Accuracy",colour = "n-gram")
+
+ggplot(df_summary,aes(pct_correct_predicted,mean_process_time, label = ng)) +
+    geom_line(aes(colour = as.factor(100*pct_data))) +
+    geom_errorbar(limits, width=0.2) + 
+    geom_text(size=2, hjust = 0, nudge_x = 0.25) + 
+    geom_hline(yintercept=500) + 
+    labs(title = "Process Time (ms) vs Model Accruacy, color = % train, label = n-gram", y="Average process time for prediction (ms)", x="Model Accuracy",colour = "% train")
+```
+
+From this plot, if we select a training set of 0.3% of the total data, we predict an accuracy ranging from ~37-44% across n-grams ranging from 2-5 words and expect the prediction time to be less than or equal to 500 ms. 
+
+
+
+

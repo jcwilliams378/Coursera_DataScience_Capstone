@@ -1,0 +1,44 @@
+---
+title: "Test prediction"
+author: "Jeffrey Williams"
+date: "September 17, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(RSQLite)
+library(tm)
+library(magrittr)
+library(stringr)
+
+source("~/Documents/Data Science Courses/Coursera/Data Science Specialization (JHU)/Coursera_DataScience_Capstone/scripts/setup.R")
+
+source("~/Documents/Data Science Courses/Coursera/Data Science Specialization (JHU)/Coursera_DataScience_Capstone/scripts/data_cleaning.R")
+
+source("~/Documents/Data Science Courses/Coursera/Data Science Specialization (JHU)/Coursera_DataScience_Capstone/scripts/genSQLiteDB.R")
+
+source("~/Documents/Data Science Courses/Coursera/Data Science Specialization (JHU)/Coursera_DataScience_Capstone/scripts/predict_word.R")
+```
+
+## Load and clen data and prepare db of ngrams
+```{r}
+setwd("~/Documents/Data Science Courses/Coursera/Data Science Specialization (JHU)/10 Capstone Project/final/en_US/")
+
+pct = 0.003
+setup(pct = pct, training_pct = 1.0)
+
+data_cleaning()
+
+genSQLiteDB()
+```
+
+## Test predictions
+```{r}
+db <- dbConnect(SQLite(), dbname="~/Documents/Data Science Courses/Coursera/Data Science Specialization (JHU)/10 Capstone Project/final/en_US/en_final.sqlite")
+
+predict_word("Romeo and", db, num_final_predictions = 5)
+predict_word("a walk in the", db, num_final_predictions = 5)
+
+dbDisconnect(db)
+```

@@ -1,0 +1,8 @@
+base
+NLP
+tm
+RColorBrewer
+wordcloud
+ggplot2
+reshape2
+lattice

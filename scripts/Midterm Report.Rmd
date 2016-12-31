@@ -1,0 +1,264 @@
+---
+title: "Midterm Report"
+author: "Jeffrey Williams"
+date: "September 13, 2016"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, cache = TRUE)
+```
+
+# Midterm Report: Swiftkey
+
+## Summary:
+
+This report will explore the data sets of the blog, news, and twitter data from the english language set. The report will investigate the data using histograms, word clouds of the uni, bi, tri, and quad grams extracted from the data.
+
+## Import the data:
+
+```{r}
+#change this for your final project directory where you will store data locally
+setwd("~/Documents/Data Science Courses/Coursera/Data Science Specialization (JHU)/10 Capstone Project/")
+
+pct <- 0.05
+
+import_data <- function(fname){
+        
+        f_path <- paste("./final/en_US/", fname, sep = "")
+        conn.in <- file(f_path)
+        data_in <- readLines(conn.in)
+        close(conn.in)
+        
+        print(paste("Number of lines in the",fname ,"dataset: ",length(data_in)))
+        print(paste(fname, "info (size [MB]): ", file.info(f_path)$size/1048576))
+        
+        return(data_in)
+}
+
+fnames <- c(paste("train.blog_sample.",pct,".txt", sep = ""),
+            paste("train.news_sample.",pct,".txt", sep = ""),
+            paste("train.twitter_sample.",pct,".txt", sep = ""),
+            "combined.training_set.txt")
+
+blog.train <- import_data(fnames[1])
+news.train <- import_data(fnames[2])
+twitter.train <- import_data(fnames[3])
+combined.train <- import_data(fnames[4])
+```
+
+## Clean the data
+```{r}
+require(tm)
+# Preprocessing
+# In this step, we want to remove numbers, capitialzation, common words, punctuation, and prepare the text for analysis.
+blog_text <- Corpus(VectorSource(blog.train))
+news_text <- Corpus(VectorSource(news.train))
+twitter_text <- Corpus(VectorSource(twitter.train))
+comb_text <- Corpus(VectorSource(combined.train))
+
+#clean as we go the larger file which will not be used
+rm(blog.train); rm(news.train); rm(twitter.train); rm(combined.train)
+
+text_cleaning <- function(text){
+        # Removing punctuation
+        text <- tm_map(text, removePunctuation)  
+        
+        # Removing numbers
+        # For now, we will analyze the text without numbers. In the future, we may want to implement ML methods that interact with numbers. But for this initial investigation, numbers will be ommitted.
+        text <- tm_map(text, removeNumbers)  
+        
+        # Converting to lowercase
+        # In the next section, we will remove all capitilization from the words to count exact word matches equally. In the future, we may want to distinguish capitlization, but for now, we will ommit case sensitivity from the analysis.
+        text <- tm_map(text, tolower)  
+        
+        # Stripping unnecessary whitespace from your documents:
+        # The following, will strip out all the whitespace in the text.
+        text <- tm_map(text, stripWhitespace)
+        
+        #format back to a plaintext document:
+        text <- tm_map(text, PlainTextDocument) 
+        
+        return(text)
+}
+
+blog_text_clean <- text_cleaning(blog_text)
+news_text_clean <- text_cleaning(news_text)
+twitter_text_clean <- text_cleaning(twitter_text)
+comb_text_clean <- text_cleaning(comb_text)
+```
+
+## Create TermDocument Matrix for Analysis
+
+```{r echo=FALSE}
+
+#create a tdm with the data
+blog.tdm <- TermDocumentMatrix(blog_text_clean)
+news.tdm <- TermDocumentMatrix(news_text_clean)
+twitter.tdm <- TermDocumentMatrix(twitter_text_clean)
+comb.tdm <- TermDocumentMatrix(comb_text_clean)
+
+#remove sparsity:
+# blog.tdm.s <- removeSparseTerms(blog.tdm, sparse=0.7)
+# news.tdm.s <- removeSparseTerms(news.tdm, sparse=0.7)
+# twitter.tdm.s <- removeSparseTerms(twitter.tdm, sparse=0.7)
+# comb.tdm.s <- removeSparseTerms(comb.tdm, sparse=0.7)
+
+# clean up unused files from workspeace
+# rm(blog.tdm); rm(news.tdm); rm(twitter.tdm); rm(comb.tdm)
+
+#create a function for generating dataframe of frequent terms
+frequent_terms <- function(tdm, low_freq = 50, num = 10){ # Show this many top frequent terms
+  
+  if (nrow(tdm) < num){
+    num <- nrow(tdm)
+  }
+  
+  FreqTerms <- findFreqTerms(tdm, lowfreq = low_freq)
+  
+  m <- as.matrix(tdm[FreqTerms,])
+  v <- sort(rowSums(m),decreasing=TRUE)
+  d <- data.frame(word = names(v),freq=v)
+  
+  return(head(d,num))
+}
+
+num_words <- 25 # take the top 25 words
+
+blog_freq <- frequent_terms(blog.tdm, num = num_words)
+news_freq <- frequent_terms(news.tdm, num = num_words)
+twitter_freq <- frequent_terms(twitter.tdm, num = num_words)
+comb_freq <- frequent_terms(comb.tdm, num = num_words)
+```
+
+## Plot the word Clouds:
+
+### Blogs
+```{r}
+require(wordcloud)
+wordcloud(words = blog_freq$word, freq = blog_freq$freq, min.freq = 2,
+          max.words=10, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
+```
+
+### News
+```{r}
+wordcloud(words = news_freq$word, freq = news_freq$freq, min.freq = 2,
+          max.words=10, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
+```
+
+### Twitter
+```{r}
+wordcloud(words = twitter_freq$word, freq = twitter_freq$freq, min.freq = 2,
+          max.words=10, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
+```
+
+### Combined
+```{r}
+wordcloud(words = comb_freq$word, freq = comb_freq$freq, min.freq = 2,
+          max.words=10, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))
+```
+
+## BarCharts (histograms)
+
+### Combined
+```{r}
+barplot(comb_freq[1:10,]$freq, las = 2, names.arg = comb_freq[1:10,]$word,
+        col ="lightblue", main ="Most frequent words",
+        ylab = "Word frequencies")
+
+require(reshape2)
+m <- merge(blog_freq,news_freq,by="word",all=TRUE,suffixes = c(".blog",".news"))
+names(twitter_freq)[2] = "freq.twitter"
+m <- merge(m,twitter_freq,by="word",all=TRUE, sort = TRUE)
+m <- na.exclude(m)
+
+m1 <- melt(m,id="word")
+
+
+library(lattice)
+barchart(word~value,data=m1,groups=variable,scales=list(x=list(rot=90,cex=0.8)),auto.key=TRUE)
+```
+
+## bi, tri quad gram frquencies
+```{r}
+require(tm)
+
+tdm_Ngram <- function(my_corpus, ng){
+  # NgTokenizer <- function(x) ngram_asweka(as.character(x), min = ng, max = ng, sep = " ")# create n-grams
+  # tdm <- TermDocumentMatrix(my_corpus, control = list(tokenize = NgTokenizer)) # create tdm from n-grams
+  
+  mytokTxts <- function(x) unlist(lapply(ngrams(words(x), ng), paste, collapse = " "), use.names = FALSE)
+
+  tdm <- TermDocumentMatrix(my_corpus, control = list(tokenize = mytokTxts)) # create tdm from n-grams
+  
+  return(tdm)
+}
+
+chart_bar <- function(df){
+  df$word<-factor(df$word, levels=df[order(df$freq), "word"])
+  barchart(word~freq,data=df, scales=list(x=list(rot=90,cex=0.8)))
+}
+
+num_words <- 10
+low_freq <- 1
+
+ng <- 2
+blog.tdm.bi <- tdm_Ngram(blog_text_clean, ng=ng)
+blog_freq.bi <- frequent_terms(blog.tdm.bi, num = num_words, low_freq = low_freq)
+chart_bar(blog_freq.bi)
+
+news.tdm.bi <- tdm_Ngram(news_text_clean, ng=ng)
+news_freq.bi <- frequent_terms(news.tdm.bi, num = num_words)
+chart_bar(news_freq.bi)
+
+twitter.tdm.bi <- tdm_Ngram(twitter_text_clean ,ng=ng)
+twitter_freq.bi <- frequent_terms(twitter.tdm.bi, num = num_words)
+chart_bar(twitter_freq.bi)
+
+comb.tdm.bi <- tdm_Ngram(comb_text_clean ,ng=ng)
+comb_freq.bi <- frequent_terms(comb.tdm.bi, num = num_words)
+chart_bar(comb_freq.bi)
+
+ng <- 3
+comb.tdm.tri <- tdm_Ngram(comb_text_clean ,ng=ng)
+comb_freq.tri <- frequent_terms(comb.tdm.tri, num = num_words)
+chart_bar(comb_freq.tri)
+
+ng <- 4
+comb.tdm.quad <- tdm_Ngram(comb_text_clean ,ng=ng)
+comb_freq.quad <- frequent_terms(comb.tdm.quad, num = num_words)
+chart_bar(comb_freq.quad)
+
+ng <- 5
+comb.tdm.quint <- tdm_Ngram(comb_text_clean ,ng=ng)
+comb_freq.quint <- frequent_terms(comb.tdm.quint, num = num_words)
+chart_bar(comb_freq.quint)
+
+```
+
+## Generate and Save the n-gram dataframes for use later with the algorithm:
+
+```{r}
+export_ng <- function(my_corpus, ng, num_words = Inf, low_freq = 1, overwrite = FALSE){
+  if (!file.exists(paste("./final/en_US/ng_",ng,".csv",sep = "")) || overwrite){
+    print(paste("Creating ng dataset of value", ng))
+    my_tdm <- tdm_Ngram(my_corpus ,ng=ng)
+    comb_freq <- frequent_terms(my_tdm, low_freq = low_freq, num = num_words)
+    fwrite(comb_freq, paste("./final/en_US/ng_",ng,".csv",sep = ""))
+    print(sum(comb_freq$freq))
+    
+    return(comb_freq)
+
+  }
+}
+
+for (ng in c(1,2,3,4,5)){
+  x <- export_ng(comb_text_clean, ng = ng, overwrite = TRUE)
+}
+
+```
+
